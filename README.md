@@ -12,11 +12,6 @@ Built as a lead-generation tool for [Credex](https://credex.rocks), which sells 
 
 ---
 
-## Screenshots
-
-> *Add 3 screenshots or a Loom/YouTube 30-second recording here after first deploy*
-
----
 
 ## Quick Start
 
