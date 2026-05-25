@@ -174,10 +174,16 @@ export default function AuditPage() {
         throw new Error(err.error ?? "Failed to run audit");
       }
 
-      const { slug } = (await res.json()) as { slug: string };
+      const { slug, result } = (await res.json()) as { slug: string; result: unknown };
 
       // Clear localStorage after successful submission
       localStorage.removeItem(STORAGE_KEY);
+
+      // If no DB is configured the API returns a local-* slug with the result embedded.
+      // Stash it in sessionStorage so the results page can render without a DB query.
+      if (slug.startsWith("local-") && result) {
+        sessionStorage.setItem(`stacklens-result-${slug}`, JSON.stringify(result));
+      }
 
       router.push(`/results/${slug}`);
     } catch (err) {

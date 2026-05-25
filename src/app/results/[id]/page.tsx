@@ -1,15 +1,19 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { createBrowserClient } from "@/lib/supabase";
 import type { AuditResult } from "@/lib/audit-engine";
 import ResultsClient from "./ResultsClient";
+
 
 // ---------------------------------------------------------------------------
 // FETCH AUDIT
 // ---------------------------------------------------------------------------
 
 async function getAudit(slug: string): Promise<AuditResult | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl || supabaseUrl.includes("your-project")) return null;
+
   try {
+    const { createBrowserClient } = await import("@/lib/supabase");
     const supabase = createBrowserClient();
     const { data, error } = await supabase
       .from("audits")
@@ -88,6 +92,14 @@ export default async function ResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  // local-* slugs are produced when Supabase is not configured.
+  // The result is stored in sessionStorage client-side — pass null here
+  // and ResultsClient will hydrate itself from sessionStorage.
+  if (id.startsWith("local-")) {
+    return <ResultsClient result={null} slug={id} />;
+  }
+
   const result = await getAudit(id);
 
   if (!result) {

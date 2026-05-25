@@ -67,20 +67,33 @@ const ACTION_CONFIG: Record<
 // ---------------------------------------------------------------------------
 
 export default function ResultsClient({
-  result,
+  result: resultProp,
   slug,
 }: {
-  result: AuditResult;
+  result: AuditResult | null;
   slug: string;
 }) {
+  const [result] = useState<AuditResult | null>(() => {
+    if (resultProp !== null) return resultProp;
+    // For local-* slugs: read from sessionStorage set by the audit form.
+    // This runs synchronously on the client so no effect is needed.
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = sessionStorage.getItem(`stacklens-result-${slug}`);
+      if (stored) return JSON.parse(stored) as AuditResult;
+    } catch { /* ignore */ }
+    return null;
+  });
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
 
-  // Fetch AI summary
+  // Fetch AI summary (only once result is available)
   useEffect(() => {
+    if (!result) return;
+
     const fetchSummary = async () => {
       try {
         const res = await fetch("/api/summary", {
@@ -100,6 +113,19 @@ export default function ResultsClient({
     };
     fetchSummary();
   }, [result]);
+
+  // No result means sessionStorage was empty (stale or direct URL with no DB)
+  if (!result) {
+    return (
+      <div style={{ background: "var(--color-bg-base)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <Loader2 size={32} color="var(--color-accent)" style={{ animation: "spin 1s linear infinite", marginBottom: 16 }} />
+          <p style={{ color: "var(--color-text-secondary)" }}>Loading your audit…</p>
+        </div>
+      </div>
+    );
+  }
+
 
   // Share URL
   const handleShare = async () => {

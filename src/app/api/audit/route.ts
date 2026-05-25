@@ -87,17 +87,30 @@ export async function POST(req: NextRequest) {
     primaryUseCase: input.primaryUseCase,
   };
 
-  // Save to Supabase
-  const supabase = createServerClient();
-  const { error: dbError } = await supabase.from("audits").insert({
-    slug,
-    form_data: publicFormData,
-    result: result as unknown as Record<string, unknown>,
-  });
+  // Save to Supabase (skip gracefully if env vars are not configured)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (dbError) {
-    console.error("[audit] DB insert error:", dbError);
-    // Still return the result even if DB fails — don't block the user
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes("your-project")) {
+    console.warn("[audit] Supabase env vars not configured — skipping DB insert");
+    return NextResponse.json({ slug: `local-${nanoid(6)}`, result });
+  }
+
+  try {
+    const supabase = createServerClient();
+    const { error: dbError } = await supabase.from("audits").insert({
+      slug,
+      form_data: publicFormData,
+      result: result as unknown as Record<string, unknown>,
+    });
+
+    if (dbError) {
+      console.error("[audit] DB insert error:", dbError);
+      // Still return the result even if DB fails — don't block the user
+      return NextResponse.json({ slug: `local-${nanoid(6)}`, result });
+    }
+  } catch (err) {
+    console.error("[audit] Supabase client error:", err);
     return NextResponse.json({ slug: `local-${nanoid(6)}`, result });
   }
 
