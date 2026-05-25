@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, ArrowRight, ArrowLeft, AlertCircle, Loader2, BarChart3 } from "lucide-react";
@@ -50,23 +51,21 @@ const USE_CASE_OPTIONS: { value: UseCase; label: string; emoji: string }[] = [
 export default function AuditPage() {
   const router = useRouter();
   const [step, setStep] = useState(0); // 0 = team info, 1 = tools
-  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [form, setForm] = useState<FormState>(() => {
+    if (typeof window === "undefined") return DEFAULT_FORM;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved) as FormState;
+    } catch {
+      // Ignore parse errors
+    }
+    return DEFAULT_FORM;
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // --- Load from localStorage on mount ---
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as FormState;
-        setForm(parsed);
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }, []);
+
 
   // --- Persist to localStorage on change ---
   useEffect(() => {
@@ -196,12 +195,12 @@ export default function AuditPage() {
       {/* Nav */}
       <nav style={{ borderBottom: "1px solid var(--color-border)", padding: "0" }}>
         <div className="container" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
             <div style={{ width: 24, height: 24, borderRadius: 6, background: "linear-gradient(135deg, var(--color-accent), var(--color-blue))", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <BarChart3 size={12} color="#000" />
             </div>
             <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>StackLens</span>
-          </a>
+          </Link>
           <div style={{ display: "flex", gap: 8 }}>
             {[0, 1].map((s) => (
               <div

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingDown,
@@ -140,7 +141,7 @@ export default function ResultsClient({
             justifyContent: "space-between",
           }}
         >
-          <a
+          <Link
             href="/"
             style={{
               display: "flex",
@@ -171,7 +172,7 @@ export default function ResultsClient({
             >
               StackLens
             </span>
-          </a>
+          </Link>
 
           <div style={{ display: "flex", gap: 10 }}>
             <button
