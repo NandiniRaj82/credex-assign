@@ -74,6 +74,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseReady = supabaseUrl && supabaseKey && !supabaseUrl.includes("your-project");
+
+  if (!supabaseReady) {
+    console.warn("[lead] Supabase env vars not configured — skipping DB insert and email");
+    return NextResponse.json({ success: true, isHighValue: (data.totalMonthlySavings ?? 0) >= 500 }, { status: 201 });
+  }
+
   const supabase = createServerClient();
 
   // --- Look up the audit by slug to get its UUID ---
@@ -90,46 +99,57 @@ export async function POST(req: NextRequest) {
   const isHighValue = data.isHighValue ?? (data.totalMonthlySavings ?? 0) >= 500;
 
   // --- Upsert lead (don't error if duplicate email for same audit) ---
-  const { data: lead, error: leadError } = await supabase
-    .from("leads")
-    .insert({
-      audit_id: auditRow?.id ?? null,
-      email: data.email,
-      company: data.company ?? null,
-      role: data.role ?? null,
-      team_size: data.teamSize ?? null,
-      monthly_savings: data.totalMonthlySavings ?? null,
-      high_value: isHighValue,
-      email_sent: false,
-    })
-    .select("id")
-    .single();
+  let lead: { id: string } | null = null;
+  try {
+    const { data: insertedLead, error: leadError } = await supabase
+      .from("leads")
+      .insert({
+        audit_id: auditRow?.id ?? null,
+        email: data.email,
+        company: data.company ?? null,
+        role: data.role ?? null,
+        team_size: data.teamSize ?? null,
+        monthly_savings: data.totalMonthlySavings ?? null,
+        high_value: isHighValue,
+        email_sent: false,
+      })
+      .select("id")
+      .single();
 
-  if (leadError) {
-    console.error("[lead] DB insert error:", leadError);
-    // Return success anyway — don't block user on DB issues
+    if (leadError) {
+      console.error("[lead] DB insert error:", leadError);
+    } else {
+      lead = insertedLead;
+    }
+  } catch (err) {
+    console.error("[lead] Supabase client error:", err);
   }
 
   // --- Send confirmation email (non-blocking) ---
   if (lead) {
-    const emailSent = await sendAuditEmail({
-      to: data.email,
-      auditSlug: data.auditSlug,
-      totalMonthlySavings: data.totalMonthlySavings ?? 0,
-      totalAnnualSavings: data.totalAnnualSavings ?? 0,
-      isHighValue,
-      toolCount: data.toolCount ?? 1,
-    });
+    try {
+      const emailSent = await sendAuditEmail({
+        to: data.email,
+        auditSlug: data.auditSlug,
+        totalMonthlySavings: data.totalMonthlySavings ?? 0,
+        totalAnnualSavings: data.totalAnnualSavings ?? 0,
+        isHighValue,
+        toolCount: data.toolCount ?? 1,
+      });
 
-    if (emailSent) {
-      await supabase
-        .from("leads")
-        .update({ email_sent: true })
-        .eq("id", lead.id);
+      if (emailSent) {
+        await supabase
+          .from("leads")
+          .update({ email_sent: true })
+          .eq("id", lead.id);
+      }
+    } catch (err) {
+      console.error("[lead] Email send error:", err);
     }
   }
 
   return NextResponse.json({ success: true, isHighValue }, { status: 201 });
+
 }
 
 // ---------------------------------------------------------------------------
